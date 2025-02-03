@@ -17,8 +17,9 @@ using Microsoft::WRL::ComPtr;
 
 // Global stuff
 Shader* basicShader;
-ComPtr<ID3D11Buffer> vertexBuffer;
 ComPtr<ID3D11InputLayout> inputLayout;
+ComPtr<ID3D11Buffer> vertexBuffer;
+ComPtr<ID3D11Buffer> indexBuffer;
 
 // Game
 Game::Game() noexcept(false) {
@@ -58,19 +59,29 @@ void Game::Initialize(HWND window, int width, int height) {
 		inputLayout.ReleaseAndGetAddressOf());
 
 	// START CUSTOM CODE AREA
-	// TP: allouer vertexBuffer ici
 
+	// Alloue Vertex Buffer
 	std::vector<float> vertexs = {
 		-0.5f, 0.5f, 0.0f,
 		0.5f, 0.5f, 0.0f,
 		-0.5f, -0.5f, 0.0f,
 		0.5f, -0.5f, 0.0f
 	};
+	CD3D11_BUFFER_DESC descVert(sizeof(float) * vertexs.size(), D3D11_BIND_VERTEX_BUFFER);
+	D3D11_SUBRESOURCE_DATA subResDataVert = { };
+	subResDataVert.pSysMem = vertexs.data(); // pointeur vers la data
+	device->CreateBuffer(&descVert, &subResDataVert, vertexBuffer.ReleaseAndGetAddressOf());
 
-	CD3D11_BUFFER_DESC desc(sizeof(float) * vertexs.size(), D3D11_BIND_VERTEX_BUFFER);
-	D3D11_SUBRESOURCE_DATA subResData = { };
-	subResData.pSysMem = vertexs.data(); // pointeur vers la data
-	device->CreateBuffer(&desc, &subResData, vertexBuffer.ReleaseAndGetAddressOf());
+
+	// Alloue Index Buffer
+	std::vector<uint32_t> indexs = {
+		0, 1, 2,
+		2, 1, 3
+	};
+	CD3D11_BUFFER_DESC descInd(sizeof(uint32_t) * indexs.size(), D3D11_BIND_INDEX_BUFFER);
+	D3D11_SUBRESOURCE_DATA subResDataInd = { };
+	subResDataInd.pSysMem = indexs.data(); // pointeur vers la data
+	device->CreateBuffer(&descInd, &subResDataInd, indexBuffer.ReleaseAndGetAddressOf());
 
 	// END OF CUSTOM CODE AREA
 }
@@ -121,12 +132,14 @@ void Game::Render() {
 	// START CUSTOM CODE AREA
 	// TP: Tracer votre vertex buffer ici
 
+	// Set Vertex Buffer
 	ID3D11Buffer* vbs[] = { vertexBuffer.Get() };
 	const unsigned int strides[] = { sizeof(float) * 3 };
 	const unsigned int offsets[] = { 0 };
 	context->IASetVertexBuffers(0, 1, vbs, strides, offsets);
+	context->IASetIndexBuffer(indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 
-	context->Draw(4, 0);
+	context->DrawIndexed(6, 0, 0);
 
 	// END OF CUSTOM CODE AREA
 
