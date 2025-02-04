@@ -8,27 +8,17 @@
 #include "PerlinNoise.hpp"
 #include "Engine/Shader.h"
 
+#include "Engine/VertexLayout.h";
+#include "Engine/Buffers.h";
+#include "Custom/MeshHelper.h";
+
 extern void ExitGame() noexcept;
 
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
 using Microsoft::WRL::ComPtr;
-
-// Global stuff
-Shader* basicShader;
-ComPtr<ID3D11InputLayout> inputLayout;
-ComPtr<ID3D11Buffer> vertexBuffer;
-ComPtr<ID3D11Buffer> indexBuffer;
-ComPtr<ID3D11Buffer> modelBuffer;
-ComPtr<ID3D11Buffer> cameraBuffer;
-
-// Camera Settings
-Vector3 camPos;
-Quaternion camRot;
-Matrix mWorld;
-Matrix mLookat;
-Matrix mpfov;
+using VL_PUV = VertexLayout_PositionUV;
 
 // Matrix Data Structures to pass to GPU
 struct ModelData {
@@ -39,6 +29,21 @@ struct CameraData {
 	Matrix View;
 	Matrix Projection;
 };
+
+// Global stuff
+Shader* basicShader;
+ComPtr<ID3D11InputLayout> inputLayout;
+VertexBuffer<VL_PUV> vertexBuffer;
+IndexBuffer indexBuffer;
+ConstantBuffer<ModelData> modelBuffer;
+ConstantBuffer<CameraData> cameraBuffer;
+
+// Camera Settings
+Vector3 camPos;
+Quaternion camRot;
+Matrix mWorld;
+Matrix mView;
+Matrix mProjection;
 
 // Game
 Game::Game() noexcept(false) {
@@ -66,38 +71,37 @@ void Game::Initialize(HWND window, int width, int height) {
 	basicShader = new Shader(L"Basic");
 	basicShader->Create(m_deviceResources.get());
 
-	auto device = m_deviceResources->GetD3DDevice();
-
-	const std::vector<D3D11_INPUT_ELEMENT_DESC> InputElementDescs = {
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	};
-
-	device->CreateInputLayout(
-		InputElementDescs.data(), InputElementDescs.size(),
-		basicShader->vsBytecode.data(), basicShader->vsBytecode.size(),
-		inputLayout.ReleaseAndGetAddressOf());
 
 	// START CUSTOM CODE AREA
+
+	// Generate Input Layout
+	ID3D11Device1* device = m_deviceResources->GetD3DDevice();
+	GenerateInputLayout<VL_PUV>(m_deviceResources.get(), basicShader);
 
 	// Setup Camera Datas
 	camPos = Vector3::Zero;
 	camRot = Quaternion::LookRotation(Vector3::Forward, Vector3::Up);
 	mWorld = Matrix::CreateWorld(Vector3::Zero, Vector3::Forward, Vector3::Up);
-	mLookat = Matrix::CreateFromQuaternion(camRot);
-	mpfov = Matrix::CreatePerspectiveFieldOfView(XMConvertToRadians(90.0f), (float)width/(float)height, 0.01f, 100.0f);
+	mView = Matrix::CreateFromQuaternion(camRot);
+	mProjection = Matrix::CreatePerspectiveFieldOfView(XMConvertToRadians(90.0f), (float)width/(float)height, 0.01f, 100.0f);
+
+
+	/*std::vector<float> vertexs = {};
+	std::vector<uint32_t> indexs = {};
+	MeshHelper::PushCW(vertexs, indexs, Vector3(0, 0, 3.0f), 1.0f);*/
 
 
 	// Alloue Vertex Buffer
-	std::vector<float> vertexs = {
-		-0.5f, 0.5f, 0.0f,
-		0.5f, 0.5f, 0.0f,
-		-0.5f, -0.5f, 0.0f,
-		0.5f, -0.5f, 0.0f
+	std::vector<VL_PUV> vertexs = {
+		{{ -0.5f, 0.5f, 0.0f, 0.0f }, { 0.0f, 1.0f }},
+		{{ 0.5f, 0.5f, 0.0f, 0.0f }, { 1.0f, 1.0f }},
+		{{ -0.5f, -0.5f, 0.0f, 0.0f }, { 0.0f, 0.0f }},
+		{{ 0.5f, -0.5f, 0.0f, 0.0f }, { 1.0f, 0.0f }},
 	};
-	CD3D11_BUFFER_DESC descVert(sizeof(float) * vertexs.size(), D3D11_BIND_VERTEX_BUFFER);
-	D3D11_SUBRESOURCE_DATA subResDataVert = { };
-	subResDataVert.pSysMem = vertexs.data(); // pointeur vers la data
-	device->CreateBuffer(&descVert, &subResDataVert, vertexBuffer.ReleaseAndGetAddressOf());
+
+	std::vector<VL_PUV>* vbuf = vertexBuffer.get();
+	vbuf->insert(vbuf->end(), vertexs.begin(), vertexs.end());
+	vertexBuffer.Create(device);
 
 
 	// Alloue Index Buffer
@@ -105,17 +109,15 @@ void Game::Initialize(HWND window, int width, int height) {
 		0, 1, 2,
 		2, 1, 3
 	};
-	CD3D11_BUFFER_DESC descInd(sizeof(uint32_t) * indexs.size(), D3D11_BIND_INDEX_BUFFER);
-	D3D11_SUBRESOURCE_DATA subResDataInd = { };
-	subResDataInd.pSysMem = indexs.data(); // pointeur vers la data
-	device->CreateBuffer(&descInd, &subResDataInd, indexBuffer.ReleaseAndGetAddressOf());
+
+	std::vector<uint32_t>* ibuf = indexBuffer.get();
+	ibuf->insert(ibuf->end(), indexs.begin(), indexs.end());
+	indexBuffer.Create(device);
 
 
 	// Alloue Model + Camera Matrix Buffers
-	CD3D11_BUFFER_DESC descModel(sizeof(ModelData), D3D11_BIND_CONSTANT_BUFFER);
-	device->CreateBuffer(&descModel, nullptr, modelBuffer.ReleaseAndGetAddressOf());
-	CD3D11_BUFFER_DESC descCamera(sizeof(CameraData), D3D11_BIND_CONSTANT_BUFFER);
-	device->CreateBuffer(&descCamera, nullptr, cameraBuffer.ReleaseAndGetAddressOf());
+	modelBuffer.Create(device);
+	cameraBuffer.Create(device);
 
 	// END OF CUSTOM CODE AREA
 }
@@ -136,7 +138,7 @@ void Game::Update(DX::StepTimer const& timer) {
 	// START CUSTOM CODE AREA
 
 	// add kb/mouse interact here
-	mLookat = Matrix::CreateLookAt(
+	mView = Matrix::CreateLookAt(
 		//Vector3(0, 0, 2),
 		Vector3(2 * sin(timer.GetTotalSeconds()), 0, 2 * cos(timer.GetTotalSeconds())),
 		Vector3::Zero,
@@ -168,45 +170,40 @@ void Game::Render() {
 	context->OMSetRenderTargets(1, &renderTarget, depthStencil);
 	
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP); // CUSTOM CODE
 	context->IASetInputLayout(inputLayout.Get());
+
+	ApplyInputLayout<VL_PUV>(m_deviceResources.get());
 
 	basicShader->Apply(m_deviceResources.get());
 
 
 
-
 	// START CUSTOM CODE AREA
 
-	// Inject/Set Camera & Model Buffers
-	ID3D11Buffer* mcbs[] = { cameraBuffer.Get(), modelBuffer.Get() };
-	context->VSSetConstantBuffers(0, 2, mcbs);
+	// Apply Buffers to Context
+	vertexBuffer.Apply(context);
+	indexBuffer.Apply(context);
+	cameraBuffer.Apply(context, 0);
+	modelBuffer.Apply(context, 1);
 
-	// Update Camera Buffer 
-	CameraData cameraData = { };
-	cameraData.View = mLookat.Transpose();
-	cameraData.Projection = mpfov.Transpose();
-	context->UpdateSubresource(cameraBuffer.Get(), 0, nullptr, &cameraData, 0, 0);
+	// Update Camera Constant Buffer
+	CameraData* cameraData = cameraBuffer.get();
+	cameraData->View = mView.Transpose();
+	cameraData->Projection = mProjection.Transpose();
+	cameraBuffer.Update(context);
 
-	// Update Model Buffer
-	ModelData modelData = { };
-	//modelData.Model = mWorld.Transpose();
-	modelData.Model = Matrix::CreateTranslation(Vector3(0.5f, 0, 0)).Transpose();
-	context->UpdateSubresource(modelBuffer.Get(), 0, nullptr, &modelData, 0, 0);
+	// TODO : Update Context and Draw for each MODEL (face)
+	//context->DrawIndexed(6 * 6, 0, 0); // En fait mon code marchait maybe, mais faut re-coder avec le nouveau système là
 
-	// Set Vertex Buffer
-	ID3D11Buffer* vbs[] = { vertexBuffer.Get() };
-	const unsigned int strides[] = { sizeof(float) * 3 };
-	const unsigned int offsets[] = { 0 };
-	context->IASetVertexBuffers(0, 1, vbs, strides, offsets);
-	context->IASetIndexBuffer(indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	// Temp/Debug Code
+	ModelData* modelData = modelBuffer.get();
+	modelData->Model = mWorld.Transpose();
+	modelBuffer.Update(context);
 
-	// Draw Indexed Render
-	context->DrawIndexed(6, 0, 0);
+	int a = indexBuffer.get()->size();
+	context->DrawIndexed(indexBuffer.get()->size(), 0, 0);
 
 	// END OF CUSTOM CODE AREA
-
-
 
 
 	// envoie nos commandes au GPU pour etre afficher � l'�cran
