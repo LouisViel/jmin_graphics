@@ -2,119 +2,103 @@
 
 using Microsoft::WRL::ComPtr;
 
-template<typename TData>
+template<typename TVertex>
 class VertexBuffer {
-private:
 	ComPtr<ID3D11Buffer> buffer;
-	std::vector<TData> data;
-
 public:
-	VertexBuffer() { }
+	std::vector<TVertex> data;
+	VertexBuffer() {};
 
-	inline void Create(DeviceResources* ressources) { Create(ressources->GetD3DDevice()); }
-	void Create(ID3D11Device1* device)
-	{
-		CD3D11_BUFFER_DESC desc(sizeof(TData) * data.size(), D3D11_BIND_VERTEX_BUFFER);
-		D3D11_SUBRESOURCE_DATA subResData = { };
-		subResData.pSysMem = data.data();
-		device->CreateBuffer(&desc, &subResData, buffer.ReleaseAndGetAddressOf());
+	uint32_t PushVertex(TVertex v) {
+		data.push_back(v);
+		return data.size() - 1;
 	}
 
-	inline void Apply(DeviceResources* ressources, UINT slot = 0) { Apply(ressources->GetD3DDeviceContext(), slot); }
-	void Apply(ID3D11DeviceContext1* context, UINT slot = 0)
-	{
+	void Create(DeviceResources* deviceRes) {
+		CD3D11_BUFFER_DESC desc(
+			sizeof(TVertex) * data.size(),
+			D3D11_BIND_VERTEX_BUFFER
+		);
+		D3D11_SUBRESOURCE_DATA dataInitial = {};
+		dataInitial.pSysMem = data.data();
+
+		deviceRes->GetD3DDevice()->CreateBuffer(
+			&desc,
+			&dataInitial,
+			buffer.ReleaseAndGetAddressOf()
+		);
+	}
+
+	void UpdateBuffer(DeviceResources* deviceRes) {
+		deviceRes->GetD3DDeviceContext()->UpdateSubresource(buffer.Get(), 0, nullptr, &data, 0, 0);
+	}
+
+	void Apply(DeviceResources* deviceRes, int slot = 0) {
 		ID3D11Buffer* vbs[] = { buffer.Get() };
-		const unsigned int strides[] = { sizeof(TData) }; // TODO : revoir за, besoin potentiellement d'une multiplication nan ?
-		const unsigned int offsets[] = { 0 };
-		context->IASetVertexBuffers(slot, 1, vbs, strides, offsets);
-	}
-
-	std::vector<TData>* const get()
-	{
-		return &data;
+		const UINT strides[] = { sizeof(TVertex) };
+		const UINT offsets[] = { 0 };
+		deviceRes->GetD3DDeviceContext()->IASetVertexBuffers(slot, 1, vbs, strides, offsets);
 	}
 };
-
-
-//////////////////////////////////////////
-//////////////////////////////////////////
-//////////////////////////////////////////
-
 
 class IndexBuffer {
-private:
 	ComPtr<ID3D11Buffer> buffer;
-	std::vector<uint32_t> indexs;
-
+	std::vector<uint32_t> indices;
 public:
-	IndexBuffer() { }
+	IndexBuffer() {};
 
-	inline void Create(DeviceResources* ressources) { Create(ressources->GetD3DDevice()); }
-	void Create(ID3D11Device1* device)
-	{
-		CD3D11_BUFFER_DESC desc(sizeof(uint32_t) * indexs.size(), D3D11_BIND_INDEX_BUFFER);
-		D3D11_SUBRESOURCE_DATA subResData = { };
-		subResData.pSysMem = indexs.data();
-		device->CreateBuffer(&desc, &subResData, buffer.ReleaseAndGetAddressOf());
+	void PushTriangle(uint32_t a, uint32_t b, uint32_t c) {
+		indices.push_back(a);
+		indices.push_back(b);
+		indices.push_back(c);
 	}
 
-	inline void Apply(DeviceResources* ressources) { Apply(ressources->GetD3DDeviceContext()); }
-	void Apply(ID3D11DeviceContext1* context)
-	{
-		context->IASetIndexBuffer(buffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	size_t Size() {
+		return indices.size();
 	}
 
-	std::vector<uint32_t>* const get()
-	{
-		return &indexs;
+	void Create(DeviceResources* deviceRes) {
+		CD3D11_BUFFER_DESC desc(
+			sizeof(uint32_t) * indices.size(),
+			D3D11_BIND_INDEX_BUFFER
+		);
+		D3D11_SUBRESOURCE_DATA dataInitial = {};
+		dataInitial.pSysMem = indices.data();
+
+		deviceRes->GetD3DDevice()->CreateBuffer(
+			&desc,
+			&dataInitial,
+			buffer.ReleaseAndGetAddressOf()
+		);
+	}
+
+	void Apply(DeviceResources* deviceRes) {
+		deviceRes->GetD3DDeviceContext()->IASetIndexBuffer(buffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 	}
 };
-
-
-//////////////////////////////////////////
-//////////////////////////////////////////
-//////////////////////////////////////////
-
 
 template<typename TData>
 class ConstantBuffer {
-private:
 	ComPtr<ID3D11Buffer> buffer;
+public:
 	TData data;
 
-public:
-	ConstantBuffer() { }
+	ConstantBuffer() {};
 
-	inline void Create(DeviceResources* ressources) { Create(ressources->GetD3DDevice()); }
-	void Create(ID3D11Device1* device)
-	{
+	void Create(DeviceResources* deviceRes) {
 		CD3D11_BUFFER_DESC desc(sizeof(TData), D3D11_BIND_CONSTANT_BUFFER);
-		D3D11_SUBRESOURCE_DATA subResData = { };
-		subResData.pSysMem = &data;
-		device->CreateBuffer(&desc, &subResData, buffer.ReleaseAndGetAddressOf());
+		deviceRes->GetD3DDevice()->CreateBuffer(
+			&desc, nullptr,
+			buffer.ReleaseAndGetAddressOf()
+		);
 	}
 
-	inline void Update(DeviceResources* ressources) { Update(ressources->GetD3DDeviceContext()); }
-	void Update(ID3D11DeviceContext1* context) {
-		context->UpdateSubresource(buffer.Get(), 0, nullptr, &data, 0, 0);
+	void UpdateBuffer(DeviceResources* deviceRes) {
+		deviceRes->GetD3DDeviceContext()->UpdateSubresource(buffer.Get(), 0, nullptr, &data, 0, 0);
 	}
 
-	inline void Apply(DeviceResources* ressources, UINT slot = 0) { Apply(ressources->GetD3DDeviceContext(), slot); }
-	void Apply(ID3D11DeviceContext1* context, UINT slot = 0)
-	{
+	void ApplyToVS(DeviceResources* deviceRes, int slot = 0) {
 		ID3D11Buffer* cbs[] = { buffer.Get() };
-		context->VSSetConstantBuffers(slot, 1, cbs);
-	}
-
-	inline void UpdateAndApply(DeviceResources* ressources, UINT slot = 0) { UpdateAndApply(ressources->GetD3DDeviceContext()); }
-	void UpdateAndApply(ID3D11DeviceContext1* context, UINT slot = 0)
-	{
-		Update(context);
-		Apply(context, slot);
-	}
-
-	TData* const get()
-	{
-		return &data;
+		deviceRes->GetD3DDeviceContext()->VSSetConstantBuffers(slot, 1, cbs);
 	}
 };

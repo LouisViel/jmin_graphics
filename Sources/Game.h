@@ -34,7 +34,7 @@ public:
 
 private:
 	void Update(DX::StepTimer const& timer);
-	void Render();
+	void Render(DX::StepTimer const& timer);
 
 	// Device resources.
 	std::unique_ptr<DeviceResources>		m_deviceResources;
