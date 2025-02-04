@@ -133,7 +133,17 @@ void Game::Update(DX::StepTimer const& timer) {
 	auto const kb = m_keyboard->GetState();
 	auto const ms = m_mouse->GetState();
 	
+	// START CUSTOM CODE AREA
+
 	// add kb/mouse interact here
+	mLookat = Matrix::CreateLookAt(
+		//Vector3(0, 0, 2),
+		Vector3(2 * sin(timer.GetTotalSeconds()), 0, 2 * cos(timer.GetTotalSeconds())),
+		Vector3::Zero,
+		Vector3::Up
+	);
+
+	// END CUSTOM CODE AREA
 	
 	if (kb.Escape)
 		ExitGame();
@@ -180,7 +190,8 @@ void Game::Render() {
 
 	// Update Model Buffer
 	ModelData modelData = { };
-	modelData.Model = mWorld.Transpose();
+	//modelData.Model = mWorld.Transpose();
+	modelData.Model = Matrix::CreateTranslation(Vector3(0.5f, 0, 0)).Transpose();
 	context->UpdateSubresource(modelBuffer.Get(), 0, nullptr, &modelData, 0, 0);
 
 	// Set Vertex Buffer
