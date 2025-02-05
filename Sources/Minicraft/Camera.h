@@ -10,7 +10,7 @@ class Camera {
 	float nearPlane = 0.01f;
 	float farPlane = 500.0f;
 	
-	Vector3 camPos = Vector3(0, 0, 0);
+	Vector3 camPos = Vector3(0, 0, 2);
 	Quaternion camRot = Quaternion();
 	Matrix projection;
 	Matrix view;

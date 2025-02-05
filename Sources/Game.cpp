@@ -26,21 +26,13 @@ Shader* basicShader;
 struct ModelData {
 	Matrix model;
 };
-struct CameraData {
-	Matrix view;
-	Matrix projection;
-};
-
-// a terme a mettre dans une class Camera:
-Matrix view;
-Matrix projection;
 
 std::vector<Cube> cubes;
 Texture texture(L"terrain");
 VertexBuffer<VertexLayout_PositionUV> vertexBuffer;
 IndexBuffer indexBuffer;
 ConstantBuffer<ModelData> constantBufferModel;
-ConstantBuffer<CameraData> constantBufferCamera;
+Camera camera(75, 1);
 
 // Game
 Game::Game() noexcept(false) {
@@ -70,15 +62,13 @@ void Game::Initialize(HWND window, int width, int height) {
 	GenerateInputLayout<VertexLayout_PositionUV>(m_deviceResources.get(), basicShader);
 
 	texture.Create(m_deviceResources.get());
-
-	projection = Matrix::CreatePerspectiveFieldOfView(75.0f * XM_PI / 180.0f, (float)width / (float)height, 0.01f, 100.0f);
 	
 	for (int x = -10; x <= 10; x++) {
 		for (int y = -10; y <= 10; y++) {
-			for (int z = -10; z <= 10; z++) {
-				auto& cube = cubes.emplace_back(Vector3(x * 2, y * 2, z * 2));
+			//for (int z = -10; z <= 10; z++) {*/
+				auto& cube = cubes.emplace_back(Vector3(x * 2, 0, y * 2));
 				cube.Generate(m_deviceResources.get());
-			}
+			//}
 		}
 	}
 
@@ -93,7 +83,8 @@ void Game::Initialize(HWND window, int width, int height) {
 	indexBuffer.Create(m_deviceResources.get());
 
 	constantBufferModel.Create(m_deviceResources.get());
-	constantBufferCamera.Create(m_deviceResources.get());
+
+	camera.UpdateAspectRatio((float)width / (float)height);
 }
 
 void Game::Tick() {
@@ -107,15 +98,8 @@ void Game::Tick() {
 // Updates the world.
 void Game::Update(DX::StepTimer const& timer) {
 	auto const kb = m_keyboard->GetState();
-	auto const ms = m_mouse->GetState();
 	
-	// add kb/mouse interact here
-	view = Matrix::CreateLookAt(
-		//Vector3(0, 0, 2),
-		Vector3(2 * sin(timer.GetTotalSeconds()), 4 * sin(timer.GetTotalSeconds()), 2 * cos(timer.GetTotalSeconds())),
-		Vector3::Zero,
-		Vector3::Up
-	);
+	camera.Update(timer.GetElapsedSeconds(), kb, m_mouse.get());
 	
 	if (kb.Escape)
 		ExitGame();
@@ -144,15 +128,12 @@ void Game::Render(DX::StepTimer const& timer) {
 	ApplyInputLayout<VertexLayout_PositionUV>(m_deviceResources.get());
 
 	basicShader->Apply(m_deviceResources.get());
+	camera.ApplyCamera(m_deviceResources.get());
 
 	constantBufferModel.ApplyToVS(m_deviceResources.get(), 0);
-	constantBufferCamera.ApplyToVS(m_deviceResources.get(), 1);
 
 	texture.Apply(m_deviceResources.get());
 
-	constantBufferCamera.data.view = view.Transpose();
-	constantBufferCamera.data.projection = projection.Transpose();
-	constantBufferCamera.UpdateBuffer(m_deviceResources.get());
 	float t = timer.GetTotalSeconds();
 	for (auto cube : cubes) {
 		Matrix m = Matrix::CreateRotationX(t += 0.2) * Matrix::CreateRotationZ(t += 0.2) * Matrix::CreateRotationY(t += 0.2) * cube.model;
@@ -207,8 +188,7 @@ void Game::OnWindowSizeChanged(int width, int height) {
 
 	// The windows size has changed:
 	// We can realloc here any resources that depends on the target resolution (post processing etc)
-
-	projection = Matrix::CreatePerspectiveFieldOfView(75.0f * XM_PI / 180.0f, (float)width / (float)height, 0.01f, 100.0f);
+	camera.UpdateAspectRatio((float)width / (float)height);
 }
 
 void Game::OnDeviceLost() {
