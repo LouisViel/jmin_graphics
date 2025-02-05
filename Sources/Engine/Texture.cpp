@@ -23,6 +23,10 @@ void Texture::Create(DeviceResources* deviceRes) {
 
 void Texture::Apply(DeviceResources* deviceRes) {
 	auto d3dContext = deviceRes->GetD3DDeviceContext();
-	d3dContext->PSSetShaderResources(0, 1, textureRV.GetAddressOf());
-	d3dContext->PSSetSamplers(0, 1, samplerState.GetAddressOf());
+
+	ID3D11ShaderResourceView* srv[] = { textureRV.Get() };
+	d3dContext->PSSetShaderResources(0, 1, srv);
+
+	ID3D11SamplerState* samplers[] = { samplerState.Get() };
+	d3dContext->PSSetSamplers(0, 1, samplers);
 }

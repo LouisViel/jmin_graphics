@@ -9,6 +9,7 @@
 #include "Engine/Shader.h"
 #include "Engine/Buffers.h"
 #include "Engine/VertexLayout.h"
+#include "Engine/Texture.h"
 #include "Minicraft/Camera.h"
 #include "Minicraft/Cube.h"
 
@@ -35,6 +36,7 @@ Matrix view;
 Matrix projection;
 
 std::vector<Cube> cubes;
+Texture texture(L"terrain");
 VertexBuffer<VertexLayout_PositionUV> vertexBuffer;
 IndexBuffer indexBuffer;
 ConstantBuffer<ModelData> constantBufferModel;
@@ -42,7 +44,7 @@ ConstantBuffer<CameraData> constantBufferCamera;
 
 // Game
 Game::Game() noexcept(false) {
-	m_deviceResources = std::make_unique<DeviceResources>(DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_D32_FLOAT, 2);
+	m_deviceResources = std::make_unique<DeviceResources>(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, DXGI_FORMAT_D32_FLOAT, 2);
 	m_deviceResources->RegisterDeviceNotify(this);
 }
 
@@ -66,6 +68,8 @@ void Game::Initialize(HWND window, int width, int height) {
 	basicShader = new Shader(L"Basic");
 	basicShader->Create(m_deviceResources.get());
 	GenerateInputLayout<VertexLayout_PositionUV>(m_deviceResources.get(), basicShader);
+
+	texture.Create(m_deviceResources.get());
 
 	projection = Matrix::CreatePerspectiveFieldOfView(75.0f * XM_PI / 180.0f, (float)width / (float)height, 0.01f, 100.0f);
 	
@@ -143,6 +147,8 @@ void Game::Render(DX::StepTimer const& timer) {
 
 	constantBufferModel.ApplyToVS(m_deviceResources.get(), 0);
 	constantBufferCamera.ApplyToVS(m_deviceResources.get(), 1);
+
+	texture.Apply(m_deviceResources.get());
 
 	constantBufferCamera.data.view = view.Transpose();
 	constantBufferCamera.data.projection = projection.Transpose();
