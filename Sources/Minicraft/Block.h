@@ -1,5 +1,7 @@
 #pragma once
 
+#define BLOCK_TEXSIZE 1.0f / 16.0f
+
 #define BLOCKS(F) \
 	F( EMPTY,				-1 ) \
 	F( STONE,				1 ) \
@@ -38,9 +40,10 @@
 /* TRANSPARENT STUFF */ \
 	F( GLASS,				49, true ) \
 	F( WATER,				205, true ) \
-/* 38, 39 & 40 contains greyscale grass for biome variation */
-/* as an exercice you can try to implement that by adding back some vertex color informations to the pipeline */
-/* 52, 53 contains greyscale leaves */
+/* 38, 39 & 40 contains greyscale grass for biome variation */ \
+/* as an exercice you can try to implement that by adding back some vertex color informations to the pipeline */ \
+/* 52, 53 contains greyscale leaves */ \
+	F( COUNT, -1) 
 
 #define EXTRACT_BLOCK_ID( v ) v,
 enum BlockId: uint8_t {

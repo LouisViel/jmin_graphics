@@ -21,6 +21,8 @@ class Camera {
 	};
 	ConstantBuffer<MatrixData>* cbCamera = nullptr;
 public:
+	DirectX::BoundingFrustum bounds;
+
 	Camera(float fov, float aspectRatio);
 	~Camera();
 

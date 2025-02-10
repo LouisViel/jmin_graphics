@@ -47,8 +47,8 @@ void Camera::Update(float dt, Keyboard::State kb, Mouse* mouse) {
 			camPos += Vector3::TransformNormal(deltaMouse, viewInverse) * camSpeed * dt;
 			// TP Translate camera a partir de dx/dy
         } else if (mstate.leftButton) {
-			camRot *= Quaternion::CreateFromAxisAngle(Vector3::TransformNormal(Vector3::Right, viewInverse), -dy * dt);
-			camRot *= Quaternion::CreateFromAxisAngle(Vector3::Up, -dx * dt);
+			camRot *= Quaternion::CreateFromAxisAngle(Vector3::TransformNormal(Vector3::Right, viewInverse), -dy * dt * camSpeedRot);
+			camRot *= Quaternion::CreateFromAxisAngle(Vector3::Up, -dx * dt * camSpeedRot);
         } else {
             mouse->SetMode(Mouse::MODE_ABSOLUTE);
         }
@@ -60,6 +60,9 @@ void Camera::Update(float dt, Keyboard::State kb, Mouse* mouse) {
 	Vector3 newUp = Vector3::Transform(Vector3::Up, camRot);
 
 	view = Matrix::CreateLookAt(camPos, camPos + newForward, newUp);
+
+	BoundingFrustum::CreateFromMatrix(bounds, projection, true);
+	bounds.Transform(bounds, view.Invert());
 }
 
 void Camera::ApplyCamera(DeviceResources* deviceRes) {

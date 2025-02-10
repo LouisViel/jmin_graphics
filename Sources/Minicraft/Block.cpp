@@ -8,5 +8,6 @@ const BlockData blocksData[] = {
 };
 
 const BlockData& BlockData::Get(const BlockId id) {
+	if (id < 0 || id > COUNT) return blocksData[EMPTY];
 	return blocksData[id];
 }
