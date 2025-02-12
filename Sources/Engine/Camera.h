@@ -50,3 +50,11 @@ public:
 
 	void UpdateAspectRatio(float aspectRatio);
 };
+
+class OrthographicCamera : public Camera {
+	float width, height;
+public:
+	OrthographicCamera(float width, float height);
+
+	void UpdateSize(float width, float height);
+};

@@ -2,6 +2,13 @@
 
 #define BLOCK_TEXSIZE 1.0f / 16.0f
 
+enum ShaderPass {
+	SP_OPAQUE,
+	SP_TRANSPARENT,
+
+	SP_COUNT
+};
+
 #define BLOCKS(F) \
 	F( EMPTY,				-1 ) \
 	F( STONE,				1 ) \
@@ -38,12 +45,13 @@
 	F( FURNACE,				44, 62, 62 ) /* need an orientation & on/off flag */ \
 	F( DISPENSER,			46, 62, 62 ) /* need an orientation flag */ \
 /* TRANSPARENT STUFF */ \
-	F( GLASS,				49, true ) \
-	F( WATER,				205, true ) \
+	F( GLASS,				49 ) \
+	F( WATER,				205, SP_TRANSPARENT ) \
 /* 38, 39 & 40 contains greyscale grass for biome variation */ \
 /* as an exercice you can try to implement that by adding back some vertex color informations to the pipeline */ \
 /* 52, 53 contains greyscale leaves */ \
-	F( COUNT, -1) 
+	F( HIGHLIGHT, 180) \
+	F( COUNT, -1)
 
 #define EXTRACT_BLOCK_ID( v ) v,
 enum BlockId: uint8_t {
@@ -58,22 +66,22 @@ public:
 	int texIdTop;
 	int texIdBottom;
 
-	// temporary, should be replaced by a flag system
-	bool transparent;
+	// we should add a flag system
+	ShaderPass pass;
 public:
-	BlockData(BlockId id, int texId, bool transparent = false) :
+	BlockData(BlockId id, int texId, ShaderPass pass = SP_OPAQUE) :
 		id(id),
 		texIdSide(texId),
 		texIdTop(texId),
 		texIdBottom(texId),
-		transparent(transparent) {}
+		pass(pass) {}
 
-	BlockData(BlockId id, int texIdSide, int texIdTop, int texIdBottom, bool transparent = false) :
+	BlockData(BlockId id, int texIdSide, int texIdTop, int texIdBottom, ShaderPass pass = SP_OPAQUE) :
 		id(id),
 		texIdSide(texIdSide),
 		texIdTop(texIdTop),
 		texIdBottom(texIdBottom),
-		transparent(transparent) {}
+		pass(pass) {}
 
 	static const BlockData& Get(const BlockId id);
 };

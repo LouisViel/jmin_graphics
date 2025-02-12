@@ -11,8 +11,8 @@ class Chunk {
 	BlockId data[CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE];
 	World* world;
 
-	VertexBuffer<VertexLayout_PositionUV> vb;
-	IndexBuffer ib;
+	VertexBuffer<VertexLayout_PositionNormalUV> vb[SP_COUNT];
+	IndexBuffer ib[SP_COUNT];
 
 	Chunk* adjXPos = nullptr;
 	Chunk* adjXNeg = nullptr;
@@ -28,12 +28,12 @@ public:
 	Chunk(World* world, Vector3 pos);
 
 	void Generate(DeviceResources* deviceRes);
-	void Draw(DeviceResources* deviceRes);
+	void Draw(DeviceResources* deviceRes, ShaderPass pass);
 
 	BlockId* GetCubeLocal(int lx, int ly, int lz);
 private:
 	void PushCube(int x, int y, int z);
-	void PushFace(Vector3 pos, Vector3 up, Vector3 right, int id);
+	void PushFace(Vector3 pos, Vector3 up, Vector3 right, Vector3 normal, int id, ShaderPass pass);
 	bool ShouldRenderFace(int lx, int ly, int lz, int dx, int dy, int dz);
 
 	friend class World;

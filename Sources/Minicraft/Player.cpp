@@ -1,5 +1,6 @@
 #include "pch.h"
 
+#include "Engine/DefaultResources.h"
 #include "Player.h"
 #include "Utils.h"
 
@@ -17,6 +18,11 @@ Vector3 collisionPoints[] = {
 	{    0,  1.0f, -0.3f},
 	{    0,  1.5f,     0},
 };
+
+void Player::GenerateGPUResources(DeviceResources* deviceRes) {
+	currentCube.Generate(deviceRes);
+	highlightCube.Generate(deviceRes);
+}
 
 void Player::Update(float dt, DirectX::Keyboard::State kb, DirectX::Mouse::State ms) {
 	keyboardTracker.Update(kb);
@@ -63,21 +69,48 @@ void Player::Update(float dt, DirectX::Keyboard::State kb, DirectX::Mouse::State
 
 	camera.SetRotation(camRot);
 	camera.SetPosition(position + Vector3(0, 1.25f, 0));
+	highlightCube.model = Matrix::Identity;
 
-	if (mouseTracker.leftButton == ButtonState::PRESSED || mouseTracker.rightButton == ButtonState::PRESSED) {
-		auto cubes = Raycast(camera.GetPosition() + Vector3(0.5, 0.5, 0.5), camera.Forward(), 5);
-		for (int i = 0; i < cubes.size(); i++) {
-			auto block = world->GetCube(cubes[i][0], cubes[i][1], cubes[i][2]);
-			if (!block) continue;
-			if (*block == EMPTY) continue;
+	auto cubes = Raycast(camera.GetPosition() + Vector3(0.5, 0.5, 0.5), camera.Forward(), 5);
+	for (int i = 0; i < cubes.size(); i++) {
+		auto block = world->GetCube(cubes[i][0], cubes[i][1], cubes[i][2]);
+		if (!block) continue;
+		if (*block == EMPTY) continue;
 
-			if (mouseTracker.leftButton == ButtonState::PRESSED) {
-				world->UpdateBlock(cubes[i][0], cubes[i][1], cubes[i][2], EMPTY);
-			} else if(i > 0) {
-				world->UpdateBlock(cubes[i - 1][0], cubes[i - 1][1], cubes[i - 1][2], WOOD);
-			}
-			break;
+		highlightCube.model = Matrix::CreateTranslation(cubes[i][0], cubes[i][1], cubes[i][2]);
+		if (mouseTracker.leftButton == ButtonState::PRESSED) {
+			world->UpdateBlock(cubes[i][0], cubes[i][1], cubes[i][2], EMPTY);
+		} else if(mouseTracker.rightButton == ButtonState::PRESSED && i > 0) {
+			world->UpdateBlock(cubes[i - 1][0], cubes[i - 1][1], cubes[i - 1][2], currentCube.GetBlockId());
 		}
+		break;
 	}
 
+	if (ms.scrollWheelValue != 0) {
+		int id = currentCube.GetBlockId();
+		id = (id + signInt(ms.scrollWheelValue)) % COUNT;
+		currentCube.SetBlockId((BlockId)id);
+	}
+
+}
+
+void Player::Draw(DeviceResources* deviceRes) {
+	auto gpuRes = DefaultResources::Get();
+
+	gpuRes->noDepth.Apply(deviceRes);
+	gpuRes->cbModel.ApplyToVS(deviceRes, 0);
+
+	Matrix cubePos = Matrix::CreateTranslation(1.5,-1.5,-2) * camera.GetInverseViewMatrix();
+	gpuRes->cbModel.data.model = cubePos.Transpose();
+	gpuRes->cbModel.UpdateBuffer(deviceRes);
+	currentCube.Draw(deviceRes);
+
+	gpuRes->depthEqual.Apply(deviceRes);
+	gpuRes->cbModel.data.model = highlightCube.model.Transpose();
+	gpuRes->cbModel.UpdateBuffer(deviceRes);
+	highlightCube.Draw(deviceRes);
+
+	gpuRes->cbModel.data.model = Matrix::Identity;
+	gpuRes->cbModel.UpdateBuffer(deviceRes);
+	gpuRes->defaultDepth.Apply(deviceRes);
 }

@@ -1,5 +1,6 @@
 #include "pch.h"
 
+#include "Engine/DefaultResources.h"
 #include "World.h"
 #include "PerlinNoise.hpp"
 
@@ -38,6 +39,7 @@ float scaleHuge = 50;
 float intensityHuge = 20;
 float scaleMedium = 10;
 float intensityMedium = 5;
+int waterHeight = 12;
 
 void World::Generate(DeviceResources* deviceRes) {
 	siv::BasicPerlinNoise<float> perlin;
@@ -55,31 +57,52 @@ void World::Generate(DeviceResources* deviceRes) {
 				*block = DIRT;
 			}
 
-			auto block = GetCube(x, dirtLayer, z);
-			*block = GRASS;
+			for (int y = dirtLayer; y < waterHeight; y++) {
+				auto block = GetCube(x, y, z);
+				*block = WATER;
+			}
+
+			if (dirtLayer > waterHeight - 1) {
+				auto block = GetCube(x, dirtLayer - 1, z);
+				*block = GRASS;
+			}
 		}
 	}
 
 	for (int idx = 0; idx < WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT; idx++)
 		chunks[idx]->Generate(deviceRes);
 
-	constantBufferModel.Create(deviceRes);
+	DefaultResources::Get()->cbModel.Create(deviceRes);
 }
 
 void World::Draw(Camera* camera, DeviceResources* deviceRes) {
-	constantBufferModel.ApplyToVS(deviceRes, 0);
+	auto gpuRes = DefaultResources::Get();
+	gpuRes->cbModel.ApplyToVS(deviceRes, 0);
 
-	for (int idx = 0; idx < WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT; idx++) {
-		if (chunks[idx]->needRegen) chunks[idx]->Generate(deviceRes);
+	for (int pass = SP_OPAQUE; pass < SP_COUNT; pass++) {
+		switch (pass) {
+		case SP_OPAQUE:
+			gpuRes->opaque.Apply(deviceRes);
+			gpuRes->defaultDepth.Apply(deviceRes);
+			break;
+		case SP_TRANSPARENT:
+			gpuRes->alphaBlend.Apply(deviceRes);
+			gpuRes->depthRead.Apply(deviceRes);
+			break;
+		}
 
-		if (chunks[idx]->bounds.Intersects(camera->bounds)) {
-			constantBufferModel.data.model = chunks[idx]->model.Transpose();
-			constantBufferModel.UpdateBuffer(deviceRes);
-			chunks[idx]->Draw(deviceRes);
+		for (int idx = 0; idx < WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT; idx++) {
+			if (chunks[idx]->needRegen) chunks[idx]->Generate(deviceRes);
+
+			if (chunks[idx]->bounds.Intersects(camera->bounds)) {
+				gpuRes->cbModel.data.model = chunks[idx]->model.Transpose();
+				gpuRes->cbModel.UpdateBuffer(deviceRes);
+				chunks[idx]->Draw(deviceRes, (ShaderPass)pass);
+			}
 		}
 	}
-	constantBufferModel.data.model = Matrix::Identity;
-	constantBufferModel.UpdateBuffer(deviceRes);
+	gpuRes->cbModel.data.model = Matrix::Identity;
+	gpuRes->cbModel.UpdateBuffer(deviceRes);
 }
 
 Chunk* World::GetChunk(int cx, int cy, int cz) {

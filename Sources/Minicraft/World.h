@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/BlendState.h"
 #include "Engine/Camera.h"
 #include "Minicraft/Block.h"
 #include "Minicraft/Chunk.h"
@@ -10,11 +11,6 @@
 class Chunk;
 class World {
 	Chunk* chunks[WORLD_SIZE * WORLD_HEIGHT * WORLD_SIZE];
-
-	struct ModelData {
-		Matrix model;
-	};
-	ConstantBuffer<ModelData> constantBufferModel;
 public:
 	World();
 	virtual ~World();

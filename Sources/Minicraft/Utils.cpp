@@ -2,7 +2,20 @@
 
 #include "Utils.h"
 
+Vector4 ToVec4(const Vector3& v) {
+	return Vector4(v.x, v.y, v.z, 1.0f);
+}
+
+Vector4 ToVec4Normal(const Vector3& v) {
+	return Vector4(v.x, v.y, v.z, 0.0f);
+}
+
 float sign(float v) {
+	if (v < 0) return -1;
+	else return 1;
+}
+
+int signInt(int v) {
 	if (v < 0) return -1;
 	else return 1;
 }
