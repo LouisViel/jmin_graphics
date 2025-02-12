@@ -17,7 +17,7 @@ class Player {
 
 	PerspectiveCamera camera = PerspectiveCamera(75, 1);
 
-	Cube3D currentCube = Cube3D(WOOD);
+	Cube3D currentCube = Cube3D(HALF_SLAB);
 	Cube3D highlightCube = Cube3D(HIGHLIGHT);
 
 	DirectX::Mouse::ButtonStateTracker      mouseTracker;

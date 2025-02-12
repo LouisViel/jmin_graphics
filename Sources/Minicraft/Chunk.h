@@ -33,7 +33,7 @@ public:
 	BlockId* GetCubeLocal(int lx, int ly, int lz);
 private:
 	void PushCube(int x, int y, int z);
-	void PushFace(Vector3 pos, Vector3 up, Vector3 right, Vector3 normal, int id, ShaderPass pass);
+	void PushFace(Vector3 pos, Vector3 up, Vector3 right, Vector3 normal, int id, ShaderPass pass, float scaleY = 1.0f);
 	bool ShouldRenderFace(int lx, int ly, int lz, int dx, int dy, int dz);
 
 	friend class World;

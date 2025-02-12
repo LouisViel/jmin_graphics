@@ -46,10 +46,17 @@ void Player::Update(float dt, DirectX::Keyboard::State kb, DirectX::Mouse::State
 
 	Vector3 nextPos = position + Vector3(0, velocityY, 0) * dt;
 	auto downBlock = world->GetCube(floor(nextPos.x + 0.5f), floor(nextPos.y), floor(nextPos.z + 0.5f));
-	if (downBlock && *downBlock != EMPTY) {
-		velocityY = -5 * dt;
-		if (kb.Space)
-			velocityY = 10.0f;
+	if (downBlock) {
+		auto& blockData = BlockData::Get(*downBlock);
+		if (!(blockData.flags & BF_NO_PHYSICS)) {
+			velocityY = -5 * dt;
+			if (kb.Space)
+				velocityY = 10.0f;
+		} else if (blockData.flags & BF_GRAVITY_WATER) {
+			velocityY *= 0.7;
+			if (kb.Space)
+				velocityY = 10.0f;
+		}
 	}
 	position += Vector3(0, velocityY, 0) * dt;
 
@@ -57,7 +64,10 @@ void Player::Update(float dt, DirectX::Keyboard::State kb, DirectX::Mouse::State
 		Vector3 colPos = position + colPoint + Vector3(0.5f, 0.5f, 0.5f);
 
 		auto block = world->GetCube(floor(colPos.x), floor(colPos.y), floor(colPos.z));
-		if (block && *block != EMPTY) {
+		if (block) {
+			auto& blockData = BlockData::Get(*block);
+			if (blockData.flags & BF_NO_PHYSICS) continue;
+
 			if (colPoint.x != 0)
 				position.x += round(colPos.x) - colPos.x;
 			if (colPoint.z != 0)
@@ -75,13 +85,18 @@ void Player::Update(float dt, DirectX::Keyboard::State kb, DirectX::Mouse::State
 	for (int i = 0; i < cubes.size(); i++) {
 		auto block = world->GetCube(cubes[i][0], cubes[i][1], cubes[i][2]);
 		if (!block) continue;
-		if (*block == EMPTY) continue;
+		auto& blockData = BlockData::Get(*block);
+		if (blockData.flags & BF_NO_RAYCAST) continue;
 
 		highlightCube.model = Matrix::CreateTranslation(cubes[i][0], cubes[i][1], cubes[i][2]);
 		if (mouseTracker.leftButton == ButtonState::PRESSED) {
 			world->UpdateBlock(cubes[i][0], cubes[i][1], cubes[i][2], EMPTY);
 		} else if(mouseTracker.rightButton == ButtonState::PRESSED && i > 0) {
-			world->UpdateBlock(cubes[i - 1][0], cubes[i - 1][1], cubes[i - 1][2], currentCube.GetBlockId());
+			if (blockData.flags & BF_HALF_BLOCK && *block == currentCube.GetBlockId()) {
+				world->UpdateBlock(cubes[i][0], cubes[i][1], cubes[i][2], (BlockId)((int)currentCube.GetBlockId() + 1));
+			} else {
+				world->UpdateBlock(cubes[i - 1][0], cubes[i - 1][1], cubes[i - 1][2], currentCube.GetBlockId());
+			}
 		}
 		break;
 	}

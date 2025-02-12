@@ -9,12 +9,23 @@ enum ShaderPass {
 	SP_COUNT
 };
 
+enum BlockFlags : uint64_t {
+	BF_NONE = 0,
+	BF_CUTOUT = 1 << 1,
+	BF_NO_PHYSICS = 1 << 2,
+	BF_GRAVITY_WATER = 1 << 3,
+	BF_NO_RAYCAST = 1 << 4,
+
+	BF_HALF_BLOCK = 1 << 5,
+};
+
 #define BLOCKS(F) \
-	F( EMPTY,				-1 ) \
+	F( EMPTY,				-1, BF_NO_PHYSICS | BF_NO_RAYCAST ) \
 	F( STONE,				1 ) \
 	F( DIRT,				2 ) \
 	F( GRASS,				3, 0, 2 ) \
 	F( WOOD,				4 ) \
+	F( HALF_SLAB,		    5, 6, 6, BF_HALF_BLOCK ) \
 	F( SLAB,				5, 6, 6 ) \
 	F( BRICK,				7 ) \
 	F( STONE_BRICK,			54 ) \
@@ -45,8 +56,8 @@ enum ShaderPass {
 	F( FURNACE,				44, 62, 62 ) /* need an orientation & on/off flag */ \
 	F( DISPENSER,			46, 62, 62 ) /* need an orientation flag */ \
 /* TRANSPARENT STUFF */ \
-	F( GLASS,				49 ) \
-	F( WATER,				205, SP_TRANSPARENT ) \
+	F( GLASS,				49, BF_CUTOUT ) \
+	F( WATER,				205, BF_NO_PHYSICS | BF_GRAVITY_WATER | BF_NO_RAYCAST, SP_TRANSPARENT ) \
 /* 38, 39 & 40 contains greyscale grass for biome variation */ \
 /* as an exercice you can try to implement that by adding back some vertex color informations to the pipeline */ \
 /* 52, 53 contains greyscale leaves */ \
@@ -66,21 +77,23 @@ public:
 	int texIdTop;
 	int texIdBottom;
 
-	// we should add a flag system
+	uint64_t flags;
 	ShaderPass pass;
 public:
-	BlockData(BlockId id, int texId, ShaderPass pass = SP_OPAQUE) :
+	BlockData(BlockId id, int texId, uint64_t flags = BF_NONE, ShaderPass pass = SP_OPAQUE) :
 		id(id),
 		texIdSide(texId),
 		texIdTop(texId),
 		texIdBottom(texId),
+		flags(flags),
 		pass(pass) {}
 
-	BlockData(BlockId id, int texIdSide, int texIdTop, int texIdBottom, ShaderPass pass = SP_OPAQUE) :
+	BlockData(BlockId id, int texIdSide, int texIdTop, int texIdBottom, uint64_t flags = BF_NONE, ShaderPass pass = SP_OPAQUE) :
 		id(id),
 		texIdSide(texIdSide),
 		texIdTop(texIdTop),
 		texIdBottom(texIdBottom),
+		flags(flags),
 		pass(pass) {}
 
 	static const BlockData& Get(const BlockId id);
