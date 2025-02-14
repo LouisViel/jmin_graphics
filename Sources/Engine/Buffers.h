@@ -14,11 +14,17 @@ public:
 		return data.size() - 1;
 	}
 
+	void Clear() {
+		data.clear();
+	}
+
 	size_t Size() {
 		return data.size();
 	}
 
 	void Create(DeviceResources* deviceRes) {
+		buffer.Reset();
+		if (data.size() == 0) return;
 		CD3D11_BUFFER_DESC desc(
 			sizeof(TVertex) * data.size(),
 			D3D11_BIND_VERTEX_BUFFER
@@ -29,7 +35,7 @@ public:
 		deviceRes->GetD3DDevice()->CreateBuffer(
 			&desc,
 			&dataInitial,
-			buffer.ReleaseAndGetAddressOf()
+			buffer.GetAddressOf()
 		);
 	}
 
@@ -57,11 +63,17 @@ public:
 		indices.push_back(c);
 	}
 
+	void Clear() {
+		indices.clear();
+	}
+
 	size_t Size() {
 		return indices.size();
 	}
 
 	void Create(DeviceResources* deviceRes) {
+		buffer.Reset();
+		if (indices.size() == 0) return;
 		CD3D11_BUFFER_DESC desc(
 			sizeof(uint32_t) * indices.size(),
 			D3D11_BIND_INDEX_BUFFER
@@ -72,7 +84,7 @@ public:
 		deviceRes->GetD3DDevice()->CreateBuffer(
 			&desc,
 			&dataInitial,
-			buffer.ReleaseAndGetAddressOf()
+			buffer.GetAddressOf()
 		);
 	}
 

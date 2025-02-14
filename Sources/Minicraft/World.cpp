@@ -1,5 +1,6 @@
 #include "pch.h"
 
+#include "Engine/DefaultResources.h"
 #include "World.h"
 #include "PerlinNoise.hpp"
 
@@ -34,38 +35,74 @@ World::~World() {
 	}
 }
 
+float scaleHuge = 50;
+float intensityHuge = 20;
+float scaleMedium = 10;
+float intensityMedium = 5;
+int waterHeight = 12;
+
 void World::Generate(DeviceResources* deviceRes) {
 	siv::BasicPerlinNoise<float> perlin;
 	for (int x = 0; x < CHUNK_SIZE * WORLD_SIZE; x++) {
 		for (int z = 0; z < CHUNK_SIZE * WORLD_SIZE; z++) {
-			// perlin.noise2D_01(x, z);
-			for (int y = 0; y < 5; y++) {
-				auto block = GetCubes(x, y, z);
+			int stoneLayer = 2 + floor(perlin.noise2D_01(x / scaleHuge, z / scaleHuge) * intensityHuge);
+			for (int y = 0; y < stoneLayer; y++) {
+				auto block = GetCube(x, y, z);
+				*block = STONE;
+			}
+
+			int dirtLayer = stoneLayer + 1 + floor(perlin.noise2D_01(x / scaleMedium, z / scaleMedium) * intensityMedium);
+			for (int y = stoneLayer; y < dirtLayer; y++) {
+				auto block = GetCube(x, y, z);
 				*block = DIRT;
 			}
-			auto block = GetCubes(x, 5, z);
-			*block = GRASS;
+
+			for (int y = dirtLayer; y < waterHeight; y++) {
+				auto block = GetCube(x, y, z);
+				*block = WATER;
+			}
+
+			if (dirtLayer > waterHeight - 1) {
+				auto block = GetCube(x, dirtLayer - 1, z);
+				*block = GRASS;
+			}
 		}
 	}
 
 	for (int idx = 0; idx < WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT; idx++)
 		chunks[idx]->Generate(deviceRes);
 
-	constantBufferModel.Create(deviceRes);
+	DefaultResources::Get()->cbModel.Create(deviceRes);
 }
 
 void World::Draw(Camera* camera, DeviceResources* deviceRes) {
-	constantBufferModel.ApplyToVS(deviceRes, 0);
+	auto gpuRes = DefaultResources::Get();
+	gpuRes->cbModel.ApplyToVS(deviceRes, 0);
 
-	for (int idx = 0; idx < WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT; idx++) {
-		if (chunks[idx]->needRegen) chunks[idx]->Generate(deviceRes);
+	for (int pass = SP_OPAQUE; pass < SP_COUNT; pass++) {
+		switch (pass) {
+		case SP_OPAQUE:
+			gpuRes->opaque.Apply(deviceRes);
+			gpuRes->defaultDepth.Apply(deviceRes);
+			break;
+		case SP_TRANSPARENT:
+			gpuRes->alphaBlend.Apply(deviceRes);
+			gpuRes->depthRead.Apply(deviceRes);
+			break;
+		}
 
-		if (chunks[idx]->bounds.Intersects(camera->bounds)) {
-			constantBufferModel.data.model = chunks[idx]->model.Transpose();
-			constantBufferModel.UpdateBuffer(deviceRes);
-			chunks[idx]->Draw(deviceRes);
+		for (int idx = 0; idx < WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT; idx++) {
+			if (chunks[idx]->needRegen) chunks[idx]->Generate(deviceRes);
+
+			if (chunks[idx]->bounds.Intersects(camera->bounds)) {
+				gpuRes->cbModel.data.model = chunks[idx]->model.Transpose();
+				gpuRes->cbModel.UpdateBuffer(deviceRes);
+				chunks[idx]->Draw(deviceRes, (ShaderPass)pass);
+			}
 		}
 	}
+	gpuRes->cbModel.data.model = Matrix::Identity;
+	gpuRes->cbModel.UpdateBuffer(deviceRes);
 }
 
 Chunk* World::GetChunk(int cx, int cy, int cz) {
@@ -74,7 +111,7 @@ Chunk* World::GetChunk(int cx, int cy, int cz) {
 	return chunks[cx + cy * WORLD_SIZE + cz * WORLD_SIZE * WORLD_HEIGHT];
 }
 
-BlockId* World::GetCubes(int gx, int gy, int gz) {
+BlockId* World::GetCube(int gx, int gy, int gz) {
 	int cx = gx / CHUNK_SIZE;
 	int cy = gy / CHUNK_SIZE;
 	int cz = gz / CHUNK_SIZE;
@@ -88,7 +125,7 @@ BlockId* World::GetCubes(int gx, int gy, int gz) {
 }
 
 void World::MakeChunkDirty(int gx, int gy, int gz) {
-	auto chunk = GetChunkFromCoordinates(gx + 1, gy, gz);
+	auto chunk = GetChunkFromCoordinates(gx, gy, gz);
 	if (chunk) chunk->needRegen = true;
 }
 
@@ -100,7 +137,7 @@ Chunk* World::GetChunkFromCoordinates(int gx, int gy, int gz) {
 }
 
 void World::UpdateBlock(int gx, int gy, int gz, BlockId block) {
-	auto cube = GetCubes(gx, gy, gz);
+	auto cube = GetCube(gx, gy, gz);
 	if (!cube) return;
 	*cube = block;
 

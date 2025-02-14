@@ -58,6 +58,7 @@
 #include <fstream>
 #include <vector>
 #include <map>
+#include <array>
 
 #ifdef _DEBUG
 #include <dxgidebug.h>

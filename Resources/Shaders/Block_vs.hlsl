@@ -1,6 +1,7 @@
 struct Input {
     float4 pos : POSITION0;
-    float4 color : COLOR0;
+    float4 normal : NORMAL0;
+    float2 uv : TEXCOORD0;
 };
 
 cbuffer ModelData : register(b0) {
@@ -13,7 +14,8 @@ cbuffer CameraData : register(b1) {
 
 struct Output {
     float4 pos : SV_POSITION;
-    float4 color : COLOR0;
+    float4 normal : NORMAL0;
+    float2 uv : TEXCOORD0;
 };
 
 Output main(Input input) {
@@ -22,7 +24,8 @@ Output main(Input input) {
     output.pos = mul(input.pos, Model);
     output.pos = mul(output.pos, View);
     output.pos = mul(output.pos, Projection);
-    output.color = input.color;
+    output.normal = mul(input.normal, Model);
+    output.uv = input.uv; 
 
 	return output;
 }
